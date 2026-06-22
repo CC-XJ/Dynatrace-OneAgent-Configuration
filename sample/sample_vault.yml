@@ -1,0 +1,5 @@
+# The dir should be in /group_vars or <host-vars>/<group-name>/vault.yml
+
+vault_dt_api_token: <api-token>
+vault_dt_env_id: <env-id>
+vault_ansible_password: <password>

@@ -1,0 +1,30 @@
+# tasks/read_current_monitoring_mode.yml
+
+- name: Query current monitoring mode
+  ansible.builtin.uri:
+    url: "{{ dt_environment_url }}/api/v2/settings/effectiveValues?schemaIds=builtin:host.monitoring.mode&scope={{ dt_entity_id }}"
+    method: GET
+    headers:
+      Authorization: "Api-Token {{ dt_api_token }}"
+      Content-Type: "application/json"
+    return_content: true
+    status_code: 200
+  delegate_to: localhost
+  register: dt_effectiveValue_api_response
+
+- name: Set current monitoring mode into variable
+  ansible.builtin.set_fact:
+    dt_current_monitoring_mode: "{{ dt_effectiveValue_api_response.json['items'][0].value.monitoringMode }}"
+
+- name: Log current monitoring mode
+  ansible.builtin.debug:
+    msg: "{{ dt_hostname }} ({{ dt_entity_id }}) : {{ dt_current_monitoring_mode }}"
+
+- name: Set flag if target is not in target monitoring mode
+  ansible.builtin.set_fact:
+    dt_skip_host: "{{ dt_current_monitoring_mode == target_monitoring_mode }}"
+
+- name: Log if skipping host
+  ansible.builtin.debug:
+    msg: "Skipping {{ dt_hostname }} ({{ dt_entity_id }}), already at target monitoring mode: {{ dt_current_monitoring_mode }}"
+  when: dt_skip_host

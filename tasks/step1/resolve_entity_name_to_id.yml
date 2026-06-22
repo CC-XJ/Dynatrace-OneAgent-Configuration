@@ -1,0 +1,27 @@
+# tasks/resolve_entity_id.yml
+
+- name: Get hostname from server
+  ansible.builtin.set_fact:
+    host_name: "{{ ansible_facts['hostname'] }}"
+
+- name: Query Dynatrace entity ID by hostname
+  ansible.builtin.uri:
+    url: "{{ dt_environment_url }}/api/v2/entities?entitySelector=type(\"HOST\"),entityName.equals(\"{{ host_name }}\")"
+    method: GET
+    headers:
+      Authorization: "Api-Token {{ dt_api_token }}"
+      Content-Type: "application/json"
+    return_content: true
+    status_code: 200
+  delegate_to: localhost
+  register: dt_entity_api_response
+
+- name: Fail if no entity found for this host
+  ansible.builtin.fail:
+    msg: "No Dynatrace entity found for hostname '{{ host_name }}'"
+  when: dt_entity_api_response.json.entities | length == 0
+
+- name: Set Dynatrace response into variables
+  ansible.builtin.set_fact:
+    dt_entity_id: "{{ dt_entity_api_response.json.entities[0].entityId }}"
+    dt_hostname: "{{ dt_entity_api_response.json.entities[0].displayName }}"

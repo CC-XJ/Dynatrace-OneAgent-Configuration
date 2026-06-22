@@ -1,0 +1,65 @@
+# tasks/batch_apply_monitoring_mode.yml
+
+- name: Build list of hosts that need updating
+  ansible.builtin.set_fact:
+    dt_hosts_to_update: "{{ hostvars | dict2items
+                            | selectattr('value.dt_skip_host', 'defined')
+                            | selectattr('value.dt_skip_host', 'equalto', false)
+                            | map(attribute='value')
+                            | list }}"
+
+- name: Log hosts to be updated
+  ansible.builtin.debug:
+    msg: "Hosts to update to {{ target_monitoring_mode }}: {{ dt_hosts_to_update | map(attribute='dt_hostname') | list }}"
+
+- name: Log if no hosts need updating
+  ansible.builtin.debug:
+    msg: "All hosts already at target monitoring mode {{ target_monitoring_mode }}"
+  when: dt_hosts_to_update | length == 0
+
+- name: Build batch payload
+  ansible.builtin.set_fact:
+    dt_batch_payload: >-
+      [{% for host in dt_hosts_to_update %}
+        {
+          "schemaId": "builtin:host.monitoring.mode",
+          "scope": "{{ host.dt_entity_id }}",
+          "value": {
+            "monitoringMode": "{{ target_monitoring_mode }}"
+          }
+        }{% if not loop.last %},{% endif %}
+      {% endfor %}]
+  when: dt_hosts_to_update | length > 0
+
+- name: POST batch monitoring mode change
+  ansible.builtin.uri:
+    url: "{{ dt_environment_url }}/api/v2/settings/objects"
+    method: POST
+    headers:
+      Authorization: "Api-Token {{ dt_api_token }}"
+      Content-Type: "application/json"
+    body_format: json
+    body: "{{ dt_batch_payload }}"
+    return_content: true
+    status_code: [200, 207]
+  register: dt_batch_api_response
+  when: dt_hosts_to_update | length > 0
+
+- name: Report batch response summary
+  ansible.builtin.debug:
+    msg:
+      - "Total hosts processed: {{ dt_batch_api_response.json | length }}"
+      - "Successful: {{ dt_batch_api_response.json | selectattr('code', 'equalto', 200) | list | length }}"
+      - "Failed: {{ dt_batch_api_response.json | rejectattr('code', 'equalto', 200) | list | length }}"
+  when:
+    - dt_batch_api_response is defined
+    - dt_hosts_to_update | length > 0
+
+- name: Report any per-host failures from batch response
+  ansible.builtin.debug:
+    msg: "Failed for scope {{ item.scope }}: {{ item.error.message }}"
+  loop: "{{ dt_batch_api_response.json }}"
+  when:
+    - dt_batch_api_response is defined
+    - dt_hosts_to_update | length > 0
+    - item.code != 200

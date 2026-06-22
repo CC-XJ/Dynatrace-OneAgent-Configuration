@@ -1,0 +1,3 @@
+# The dir should be in /group_vars/<group_name>/vault.yml
+ansible_user: <username>
+ansible_password: <password>

@@ -1,0 +1,20 @@
+# tasks/verify_monitoring_mode.yml
+
+- name: Wait and verify new monitoring mode is reflected in Dynatrace
+  ansible.builtin.uri:
+    url: "{{ dt_environment_url }}/api/v2/settings/effectiveValues?schemaIds=builtin:host.monitoring.mode&scope={{ dt_entity_id }}"
+    method: GET
+    headers:
+      Authorization: "Api-Token {{ dt_api_token }}"
+      Content-Type: "application/json"
+    return_content: true
+    status_code: 200
+  delegate_to: localhost
+  register: dt_verify_api_response
+  until: dt_verify_api_response.json['items'][0].value.monitoringMode == target_monitoring_mode
+  retries: 10
+  delay: 30
+
+- name: Log verified monitoring mode
+  ansible.builtin.debug:
+    msg: "{{ dt_hostname }} ({{ dt_entity_id }}) : {{ dt_current_monitoring_mode }} to {{ dt_verify_api_response.json['items'][0].value.monitoringMode }}"
