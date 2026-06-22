@@ -1,4 +1,5 @@
 # The dir should be in /group_vars or <host-vars>/<group-name>/vault.yml
+# To encrypt vault file, use command ansible-vault encrypt <file-name>
 
 vault_dt_api_token: <api-token>
 vault_dt_env_id: <env-id>
